@@ -2,9 +2,13 @@
 <link rel="import" href="bower_components/paper-input/paper-input.html">
 
 <polymer-element name="ws-input">
-	<style></style>
 	<template>
-		<paper-input floatinglabel value="{{ content }}" id="paper_input"></paper-input>
+		<style>
+			:host #paper_input {
+				width: 400px;
+			}
+		</style>	
+		<paper-input label="Type some text to witness a miracle." floatinglabel value="{{ content }}" id="paper_input"></paper-input>
 	</template>
 	<script>
 		Polymer({
