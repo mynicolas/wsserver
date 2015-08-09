@@ -103,32 +103,6 @@ class Th(threading.Thread):
 
         self.send_data(newContent)
   
-  def recv_data(self, num):
-    all_data = self.con.recv(num)
-    if not len(all_data):
-      return False
-
-    code_len = ord(all_data[1]) & 127
-    if code_len == 126:
-      masks = all_data[4:8]
-      data = all_data[8:]
-    elif code_len == 127:
-      masks = all_data[10:14]
-      data = all_data[14:]
-    else:
-      masks = all_data[2:6]
-      data = all_data[6:]
-    raw_str = ""
-    i = 0
-    for d in data:
-      raw_str += chr(ord(d) ^ ord(masks[i % 4]))
-      i += 1
-
-    db = MySQLdb.connect(host="localhost", user="root", passwd="root", db="ws", charset="utf8")
-    cursor = db.cursor()
-    cursor.execute(updateSql % raw_str)
-    db.commit()
-    return raw_str
   
   # send data
   def send_data(self, data):
@@ -188,10 +162,10 @@ def new_service():
 
   sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
   try:
-    sock.bind(('localhost', 3368))
+    sock.bind((HOST, PORT))
     sock.listen(1000)
     #链接队列大小
-    print "bind 3368,ready to use"
+    print "bind %s,ready to use" % PORT
   except:
     print("Server is already running,quit")
     sys.exit()
