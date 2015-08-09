@@ -1,5 +1,6 @@
 <link rel="import" href="bower_components/polymer/polymer.html">
 <link rel="import" href="bower_components/paper-input/paper-input.html">
+<link rel="import" href="bower_components/paper-paper-toast/paper-paper-toast.html">
 
 <polymer-element name="ws-input">
 	<template>
@@ -7,7 +8,8 @@
 			:host #paper_input {
 				width: 400px;
 			}
-		</style>	
+		</style>
+		<paper-toast id="paper_toast" text="{{ content }}" style="padding-right: 60px;"></paper-toast>	
 		<paper-input label="Type some text to witness a miracle." floatinglabel value="{{ content }}" id="paper_input"></paper-input>
 	</template>
 	<script>
@@ -22,6 +24,7 @@
 				}
 			},
 			contentChanged: function(){
+				this.$.paper_toast.show();
 				var text = 'test' + this.content;
 				this.ws.send(text);
 			}
