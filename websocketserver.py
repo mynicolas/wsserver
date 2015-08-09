@@ -15,7 +15,7 @@ updateSql = "UPDATE websocket SET content='%s' WHERE id=1"
 getSql = "SELECT content FROM websocket WHERE id=1"
   
 # ====== config ======
-HOST = 'localhost'
+HOST = '0.0.0.0'
 PORT = 3368
 MAGIC_STRING = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11'
 HANDSHAKE_STRING = "HTTP/1.1 101 Switching Protocols\r\n" \
@@ -161,14 +161,9 @@ def new_service():
   when coms a connection, start a new thread to handle it"""
 
   sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-  try:
-    sock.bind((HOST, PORT))
-    sock.listen(1000)
-    #链接队列大小
-    print "bind %s,ready to use" % PORT
-  except:
-    print("Server is already running,quit")
-    sys.exit()
+  sock.bind((HOST, PORT))
+  sock.listen(1000)
+  print "bind %s,ready to use" % PORT
   
   while True:
     connection, address = sock.accept()
