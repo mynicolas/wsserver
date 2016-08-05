@@ -7,11 +7,13 @@ import MySQLdb
 import base64
 import hashlib
 import struct
+import time
 
-__author__ = 'Patrick'
+updateSql = "UPDATE websocket SET content='%s' WHERE id=1"
+getSql = "SELECT content FROM websocket WHERE id=1"
 
 # ====== config ======
-HOST = 'localhost'
+HOST = '0.0.0.0'
 PORT = 3368
 MAGIC_STRING = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11'
 HANDSHAKE_STRING = "HTTP/1.1 101 Switching Protocols\r\n" \
@@ -22,49 +24,101 @@ HANDSHAKE_STRING = "HTTP/1.1 101 Switching Protocols\r\n" \
     "WebSocket-Protocol:chat\r\n\r\n"
 
 
+class Update(threading.Thread):
+    def __init__(self, connection):
+        threading.Thread.__init__(self)
+        self.con = connection
+
+    def run(self):
+        while True:
+            self.recvData(1024)
+
+    def recvData(self, num):
+        all_data = self.con.recv(num)
+        if not len(all_data):
+            return False
+
+        code_len = ord(all_data[1]) & 127
+        if code_len == 126:
+            masks = all_data[4:8]
+            data = all_data[8:]
+        elif code_len == 127:
+            masks = all_data[10:14]
+            data = all_data[14:]
+        else:
+            masks = all_data[2:6]
+            data = all_data[6:]
+        raw_str = ""
+        i = 0
+        for d in data:
+            raw_str += chr(ord(d) ^ ord(masks[i % 4]))
+            i += 1
+
+        db = MySQLdb.connect(host="localhost", user="root",
+                             passwd="root", db="ws", charset="utf8")
+        cursor = db.cursor()
+        cursor.execute(updateSql % raw_str)
+        db.commit()
+        return raw_str
+
+
 class Th(threading.Thread):
-    def __init__(self, connection,):
+    def __init__(self, connection):
         threading.Thread.__init__(self)
         self.con = connection
 
     def run(self):
         while True:
             try:
-                data = self.recv_data(1024)
-                print data
+                db = MySQLdb.connect(
+                    host="localhost",
+                    user="root",
+                    passwd="root",
+                    db="ws",
+                    charset="utf8")
+                cursor = db.cursor()
+                cursor.execute(getSql)
+                data = cursor.fetchone()[0]
                 self.send_data(data)
+                self.check()
 
             except:
                 self.con.close()
 
-    def recv_data(self, num):
-        try:
-            all_data = self.con.recv(num)
-            if not len(all_data):
-                return False
-        except:
-            return False
-        else:
-            code_len = ord(all_data[1]) & 127
-            if code_len == 126:
-                masks = all_data[4:8]
-                data = all_data[8:]
-            elif code_len == 127:
-                masks = all_data[10:14]
-                data = all_data[14:]
-            else:
-                masks = all_data[2:6]
-                data = all_data[6:]
-            raw_str = ""
-            i = 0
-            for d in data:
-                raw_str += chr(ord(d) ^ ord(masks[i % 4]))
-                i += 1
-            return raw_str
+    def check(self):
+        newContent = None
+        db = MySQLdb.connect(host="localhost", user="root",
+                             passwd="root", db="ws", charset="utf8")
+        cursor = db.cursor()
+        cursor.execute(getSql)
+        content = cursor.fetchone()[0]
+        db.close()
+        update = Update(self.con)
+        update.start()
+        while True:
+            time.sleep(1)
+            db = MySQLdb.connect(host="localhost", user="root",
+                                 passwd="root", db="ws", charset="utf8")
+            cursor = db.cursor()
+            cursor.execute(getSql)
+            thisContent = cursor.fetchone()[0]
+            db.close()
+            print 'looper: %s' % thisContent
+            if content != thisContent:
+                newContent = thisContent
+                content = thisContent
+                # break
+
+                self.send_data(newContent)
 
     # send data
     def send_data(self, data):
-        print data
+        db = MySQLdb.connect(host="localhost", user="root",
+                             passwd="root", db="ws", charset="utf8")
+        cursor = db.cursor()
+        cursor.execute(getSql)
+        data = cursor.fetchone()[0]
+        print "send data: \t%s" % data
         if data:
             data = str(data)
         else:
@@ -82,8 +136,9 @@ class Th(threading.Thread):
         self.con.send(data)
         return True
 
-
 # handshake
+
+
 def handshake(con):
     headers = {}
     shake = con.recv(1024)
@@ -117,14 +172,9 @@ def new_service():
     when coms a connection, start a new thread to handle it"""
 
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    try:
-        sock.bind(('localhost', 3368))
-        sock.listen(1000)
-        # 链接队列大小
-        print "bind 3368,ready to use"
-    except:
-        print("Server is already running,quit")
-        sys.exit()
+    sock.bind((HOST, PORT))
+    sock.listen(1000)
+    print "bind %s,ready to use" % PORT
 
     while True:
         connection, address = sock.accept()
@@ -140,9 +190,6 @@ def new_service():
             except:
                 print 'start new thread error'
                 connection.close()
-                import sys
-                sys.exit()
-
 
 if __name__ == '__main__':
     new_service()
